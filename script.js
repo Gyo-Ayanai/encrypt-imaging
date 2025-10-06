@@ -18,7 +18,10 @@ function encrypt() {
   const total = grid * grid; // 余白分も含めた文字数
 
   canvas.width = grid * (size * block);
-  canvas.height = grid * (block);
+  canvas.height = grid * (block * 1);
+
+  // 文字1行ごとに「block × 1」の高さしかなかった → block × 1 ではなく「block × 1行ぶん」
+  canvas.height = grid * block; // ✅ 各行がblockの高さで1マスずつ下にずれる
 
   ctx.fillStyle = "white";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -44,3 +47,4 @@ function encrypt() {
     }
   }
 }
+
