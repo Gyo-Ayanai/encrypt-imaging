@@ -10,7 +10,7 @@ function encrypt() {
   const ctx = canvas.getContext("2d");
 
   const size = 6;      // 6マスで1文字
-  const block = 20;    // 1マスのピクセルサイズ
+  const block = 10;    // 1マスのピクセルサイズ
   const len = text.length;
 
   // --- ✅ 正方形サイズ計算 ---
@@ -47,4 +47,5 @@ function encrypt() {
     }
   }
 }
+
 
