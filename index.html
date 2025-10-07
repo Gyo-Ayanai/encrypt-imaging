@@ -1,182 +1,115 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-<meta charset="utf-8" />
-<title>タイル暗号ジェネレータ</title>
+<meta charset="UTF-8">
+<title>ひらがなタイル暗号化</title>
 <style>
-  body{font-family: sans-serif; padding:20px; background:#f7f7f7}
-  h1{margin:0 0 10px}
-  .row{margin:10px 0}
-  input[type="file"]{display:inline-block}
-  textarea{width:100%;height:80px;font-size:16px;padding:8px}
-  button{padding:8px 12px;margin-right:8px}
-  canvas{border:1px solid #bbb; display:block; margin-top:12px; max-width:100%}
-  .small{font-size:13px;color:#555}
+  body { font-family: sans-serif; padding:20px; background:#f7f7f7; }
+  textarea { width:100%; height:80px; font-size:16px; padding:8px; }
+  button { padding:8px 12px; margin:5px 5px 10px 0; }
+  canvas { border:1px solid #bbb; display:block; margin-top:12px; max-width:100%; height:auto; }
+  #log { font-size:14px; color:#555; margin-top:6px; }
 </style>
 </head>
 <body>
-  <h1>タイル暗号ジェネレータ</h1>
-  <div class="row small">まず6枚の“タイル”をアップロード（未指定はデフォルト色）。タイルは正方形推奨。</div>
-  <div class="row">
-    <input id="tile0" type="file" accept="image/*">
-    <input id="tile1" type="file" accept="image/*">
-    <input id="tile2" type="file" accept="image/*">
-    <input id="tile3" type="file" accept="image/*">
-    <input id="tile4" type="file" accept="image/*">
-    <input id="tile5" type="file" accept="image/*">
-  </div>
+<h1>ひらがなタイル暗号化</h1>
 
-  <div class="row">
-    <textarea id="inputText" placeholder="ここにひらがなを入力（ー、゛、゜は独立文字として扱われます）"></textarea>
-  </div>
-
-  <div class="row">
-    <button onclick="generate()">画像生成</button>
-    <button onclick="downloadCanvas()">画像を保存（PNG）</button>
-    <button onclick="tryDecode()">簡易復号（画像→文字）</button>
-  </div>
-
-  <canvas id="canvas"></canvas>
-  <div id="log" class="small"></div>
+<textarea id="inputText" placeholder="ここに文字を入力（あ〜ん, が〜ぽ, ぁ〜ぉ, っ, ゃ〜ょ, ー, 、, 。）"></textarea>
+<div>
+  <button onclick="generate()">画像生成</button>
+  <button onclick="downloadCanvas()">PNG保存</button>
+</div>
+<canvas id="canvas"></canvas>
+<div id="log"></div>
 
 <script>
-const hiraList = ["", "あ","い","う","え","お","か","き","く","け","こ",
+// 使用文字セット（83文字）
+const hiraList = [
+"あ","い","う","え","お","か","き","く","け","こ",
 "さ","し","す","せ","そ","た","ち","つ","て","と",
 "な","に","ぬ","ね","の","は","ひ","ふ","へ","ほ",
 "ま","み","む","め","も","や","ゆ","よ",
-"ら","り","る","れ","ろ","わ","を","ん","ー","゛","゜"];
+"ら","り","る","れ","ろ","わ","を","ん",
+"が","ぎ","ぐ","げ","ご","ざ","じ","ず","ぜ","ぞ",
+"だ","ぢ","づ","で","ど","ば","び","ぶ","べ","ぼ",
+"ぱ","ぴ","ぷ","ぺ","ぽ",
+"ぁ","ぃ","ぅ","ぇ","ぉ","っ","ゃ","ゅ","ょ",
+"ー","、","。"
+];
 
-// default colored tiles as canvas textures
-function makeDefaultTile(color, size=100){
-  const c = document.createElement('canvas');
-  c.width = c.height = size;
-  const ctx = c.getContext('2d');
-  ctx.fillStyle = color; ctx.fillRect(0,0,size,size);
-  return c;
+// 文字タイル画像を読み込む（images/文字.png）
+function loadTile(char){
+    return new Promise((resolve,reject)=>{
+        const img = new Image();
+        img.onload = ()=>resolve(img);
+        img.onerror = ()=>reject(char);
+        img.src = `images/${char}.png`;
+    });
 }
 
-// load up to 6 images from file inputs, return Promise of array of Image/Canvas
-function loadTiles(){
-  const promises = [];
-  for(let i=0;i<6;i++){
-    const inp = document.getElementById('tile'+i);
-    if(inp.files && inp.files[0]){
-      const file = inp.files[0];
-      promises.push(new Promise((res, rej)=>{
-        const fr = new FileReader();
-        fr.onload = ()=> {
-          const img = new Image();
-          img.onload = ()=> res(img);
-          img.onerror = rej;
-          img.src = fr.result;
-        };
-        fr.onerror = rej;
-        fr.readAsDataURL(file);
-      }));
-    } else {
-      // default colors (r,r,b,b,g,g)
-      const colors = ['#ff6666','#ff6666','#6699ff','#6699ff','#66cc66','#66cc66'];
-      promises.push(Promise.resolve(makeDefaultTile(colors[i])));
-    }
-  }
-  return Promise.all(promises);
-}
-
-// convert number to 6bit string
-function to6bit(n){ return (n>>>0).toString(2).padStart(6,'0').slice(-6); }
-
+// 文字列をタイル画像に変換してCanvas描画
 async function generate(){
-  const text = document.getElementById('inputText').value || "";
-  const canvas = document.getElementById('canvas');
-  const ctx = canvas.getContext('2d');
+    const text = document.getElementById('inputText').value;
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
 
-  // load tiles (6 images)
-  const tiles = await loadTiles(); // each is Image or canvas
-  // unify tile draw size (tilePx)
-  const tilePx = 40; // 1マスのピクセル（必要ならUIから変更可能）
-  // character block: horizontal 6 tiles, height tilePx
-  const sizePerChar = 6 * tilePx;
+    const len = text.length;
+    if(len===0){ alert('文字を入力してください'); return; }
 
-  // compute grid size (square)
-  const len = text.length || 0;
-  const grid = Math.max(1, Math.ceil(Math.sqrt(len)));
-  const total = grid * grid;
-
-  canvas.width = grid * sizePerChar;
-  canvas.height = grid * tilePx;
-  ctx.fillStyle = 'white';
-  ctx.fillRect(0,0,canvas.width,canvas.height);
-
-  // draw each character block
-  for(let i=0;i<total;i++){
-    const ch = text[i] || ""; // 空白なら空
-    const idx = hiraList.indexOf(ch);
-    const num = (idx===-1) ? 0 : idx;
-    const bits = to6bit(num);
-
-    const row = Math.floor(i / grid);
-    const col = i % grid;
-
-    for(let j=0;j<6;j++){
-      const x = col * sizePerChar + j * tilePx;
-      const y = row * tilePx;
-      // draw base tile scaled to tilePx
-      const tile = tiles[j];
-      // drawImage supports canvas or Image
-      ctx.drawImage(tile, x, y, tilePx, tilePx);
-      // if bit is 1, overlay black rectangle with some opacity (fully black if you want)
-      if(bits[j] === '1'){
-        ctx.fillStyle = 'black';
-        ctx.fillRect(x, y, tilePx, tilePx);
-      }
+    // 文字に対応する画像を全部ロード
+    const images = [];
+    for(let i=0;i<len;i++){
+        const ch = text[i];
+        if(!hiraList.includes(ch)){ alert(`未対応文字: ${ch}`); return; }
+        try{
+            const img = await loadTile(ch);
+            images.push(img);
+        } catch(e){
+            alert(`画像が見つかりません: ${e}`);
+            return;
+        }
     }
-  }
 
-  document.getElementById('log').textContent = `描画完了: ${len}文字 → グリッド ${grid}×${grid}`;
+    // グリッド計算（正方形に近い形）
+    const grid = Math.ceil(Math.sqrt(len));
+    const canvasWidth = document.body.clientWidth * 0.95; // 横幅の95%で最大化
+    const tileSize = Math.floor(canvasWidth / grid);
+    canvas.width = tileSize * grid;
+    canvas.height = tileSize * grid;
+
+    ctx.fillStyle = "white";
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+
+    for(let i=0;i<grid*grid;i++){
+        const row = Math.floor(i / grid);
+        const col = i % grid;
+        const x = col * tileSize;
+        const y = row * tileSize;
+
+        if(i<len){
+            ctx.drawImage(images[i], x, y, tileSize, tileSize);
+        } else {
+            // 余りマスは白塗り
+            ctx.fillStyle = "white";
+            ctx.fillRect(x, y, tileSize, tileSize);
+        }
+    }
+
+    document.getElementById('log').textContent = `描画完了: ${len}文字 → グリッド ${grid}×${grid}`;
 }
 
-// download canvas as PNG
+// PNG保存
 function downloadCanvas(){
-  const canvas = document.getElementById('canvas');
-  const url = canvas.toDataURL('image/png');
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'tile_cipher.png';
-  a.click();
-}
-
-// --- 簡易復号（画像→文字） ---
-// タイルの中心をチェックして黒かどうかでbit判定（注意: マスクが完璧であればOK）
-function tryDecode(){
-  const canvas = document.getElementById('canvas');
-  const ctx = canvas.getContext('2d');
-  if(canvas.width === 0){ alert('先に画像を生成してください'); return; }
-
-  const tilePx = 40;
-  const sizePerChar = 6 * tilePx;
-  const gridCols = Math.floor(canvas.width / sizePerChar);
-  const gridRows = Math.floor(canvas.height / tilePx);
-  let out = '';
-
-  for(let r=0;r<gridRows;r++){
-    for(let c=0;c<gridCols;c++){
-      let bits = '';
-      for(let j=0;j<6;j++){
-        const cx = Math.floor(c*sizePerChar + j*tilePx + tilePx/2);
-        const cy = Math.floor(r*tilePx + tilePx/2);
-        const p = ctx.getImageData(cx, cy, 1,1).data; // [r,g,b,a]
-        //判定: 黒かどうか（閾値）
-        const brightness = (p[0]+p[1]+p[2])/3;
-        bits += (brightness < 50) ? '1' : '0';
-      }
-      const num = parseInt(bits,2);
-      out += (hiraList[num] || '?');
-    }
-  }
-
-  document.getElementById('log').textContent = '復号結果: ' + out;
+    const canvas = document.getElementById('canvas');
+    const url = canvas.toDataURL('image/png');
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'hiragana_tile.png';
+    a.click();
 }
 </script>
 </body>
 </html>
+
+
 
