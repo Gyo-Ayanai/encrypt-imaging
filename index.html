@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>ひらがなタイル暗号化</title>
+<title>アヤナイ語メーカー</title>
 <style>
   body { font-family: sans-serif; padding:20px; background:#f7f7f7; }
   textarea { width:100%; height:80px; font-size:16px; padding:8px; }
@@ -12,7 +12,7 @@
 </style>
 </head>
 <body>
-<h1>ひらがなタイル暗号化</h1>
+<h1>アヤナイ語メーカー</h1>
 
 <textarea id="inputText" placeholder="ここに文字を入力（あ〜ん, が〜ぽ, ぁ〜ぉ, っ, ゃ〜ょ, ー, 、, 。）"></textarea>
 <div>
@@ -70,33 +70,32 @@ async function generate(){
         }
     }
 
-    // グリッド計算（正方形に近い形）
-    const grid = Math.ceil(Math.sqrt(len));
-    const canvasWidth = document.body.clientWidth * 0.95; // 横幅の95%で最大化
-    const tileSize = Math.floor(canvasWidth / grid);
-    canvas.width = tileSize * grid;
-    canvas.height = tileSize * grid;
+// グリッドサイズ
+  const n = Math.ceil(Math.sqrt(text.length));
+  const tileSize = 48; // ← 固定タイルサイズ（ここを変えれば縮小・拡大できる）
+  const w = n * tileSize;
+  const h = n * tileSize;
+  canvas.width = w;
+  canvas.height = h;
 
-    ctx.fillStyle = "white";
-    ctx.fillRect(0,0,canvas.width,canvas.height);
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(0,0,w,h);
 
-    for(let i=0;i<grid*grid;i++){
-        const row = Math.floor(i / grid);
-        const col = i % grid;
-        const x = col * tileSize;
-        const y = row * tileSize;
-
-        if(i<len){
-            ctx.drawImage(images[i], x, y, tileSize, tileSize);
-        } else {
-            // 余りマスは白塗り
-            ctx.fillStyle = "white";
-            ctx.fillRect(x, y, tileSize, tileSize);
-        }
+  for(let i=0;i<n*n;i++){
+    const x = (i % n) * tileSize;
+    const y = Math.floor(i / n) * tileSize;
+    if(i < imgs.length){
+      ctx.drawImage(imgs[i], x, y, tileSize, tileSize);
+    } else {
+      ctx.fillStyle = "#fff";
+      ctx.fillRect(x, y, tileSize, tileSize);
     }
+  }
 
-    document.getElementById('log').textContent = `描画完了: ${len}文字 → グリッド ${grid}×${grid}`;
+  document.getElementById('log').textContent =
+    `${text.length}文字 → ${n}×${n}タイル (${w}×${h}px)`;
 }
+
 
 // PNG保存
 function downloadCanvas(){
@@ -110,6 +109,7 @@ function downloadCanvas(){
 </script>
 </body>
 </html>
+
 
 
 
