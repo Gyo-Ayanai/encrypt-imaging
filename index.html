@@ -4,11 +4,36 @@
 <meta charset="UTF-8">
 <title>アヤナイ語メーカー</title>
 <style>
-  body { font-family: sans-serif; padding:20px; background:#f7f7f7; }
-  textarea { width:100%; height:80px; font-size:16px; padding:8px; }
-  button { padding:8px 12px; margin:5px 5px 10px 0; }
-  canvas { border:1px solid #bbb; display:block; margin-top:12px; max-width:100%; height:auto; }
-  #log { font-size:14px; color:#555; margin-top:6px; }
+  body {
+    font-family: sans-serif;
+    padding: 20px;
+    background: #f7f7f7;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  textarea {
+    width: 360px;
+    height: 80px;
+    font-size: 16px;
+    padding: 8px;
+    resize: none;
+  }
+  button {
+    padding: 8px 12px;
+    margin: 5px 5px 10px 0;
+  }
+  canvas {
+    border: 1px solid #bbb;
+    display: block;
+    margin-top: 12px;
+    background: white;
+  }
+  #log {
+    font-size: 14px;
+    color: #555;
+    margin-top: 6px;
+  }
 </style>
 </head>
 <body>
@@ -23,7 +48,7 @@
 <div id="log"></div>
 
 <script>
-// 使用文字セット（83文字）
+// 使用文字セット
 const hiraList = [
 "あ","い","う","え","お","か","き","く","け","こ",
 "さ","し","す","せ","そ","た","ち","つ","て","と",
@@ -37,79 +62,79 @@ const hiraList = [
 "ー","、","。"
 ];
 
-// 文字タイル画像を読み込む（images/文字.png）
-function loadTile(char){
-    return new Promise((resolve,reject)=>{
-        const img = new Image();
-        img.onload = ()=>resolve(img);
-        img.onerror = ()=>reject(char);
-        img.src = `images/${char}.png`;
-    });
+// タイル画像のロード
+function loadTile(char) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(char);
+    img.src = `images/${encodeURIComponent(char)}.png`;
+  });
 }
 
-// 文字列をタイル画像に変換してCanvas描画
-async function generate(){
-    const text = document.getElementById('inputText').value;
-    const canvas = document.getElementById('canvas');
-    const ctx = canvas.getContext('2d');
+// 画像生成
+async function generate() {
+  const text = document.getElementById("inputText").value.trim();
+  const canvas = document.getElementById("canvas");
+  const ctx = canvas.getContext("2d");
 
-    const len = text.length;
-    if(len===0){ alert('文字を入力してください'); return; }
+  if (text.length === 0) {
+    alert("文字を入力してください");
+    return;
+  }
 
-    // 文字に対応する画像を全部ロード
-    const images = [];
-    for(let i=0;i<len;i++){
-        const ch = text[i];
-        if(!hiraList.includes(ch)){ alert(`未対応文字: ${ch}`); return; }
-        try{
-            const img = await loadTile(ch);
-            images.push(img);
-        } catch(e){
-            alert(`画像が見つかりません: ${e}`);
-            return;
-        }
+  // 対応文字チェック＆画像読み込み
+  const images = [];
+  for (const ch of text) {
+    if (!hiraList.includes(ch)) {
+      alert(`未対応文字: ${ch}`);
+      return;
     }
+    try {
+      const img = await loadTile(ch);
+      images.push(img);
+    } catch (e) {
+      alert(`画像が見つかりません: ${e}`);
+      return;
+    }
+  }
 
-// グリッドサイズ
+  // グリッド計算
   const n = Math.ceil(Math.sqrt(text.length));
-  const tileSize = 48; // ← 固定タイルサイズ（ここを変えれば縮小・拡大できる）
+  const tileSize = 48; // ← タイルサイズ固定
   const w = n * tileSize;
   const h = n * tileSize;
   canvas.width = w;
   canvas.height = h;
 
+  // 背景を白で初期化
   ctx.fillStyle = "#fff";
-  ctx.fillRect(0,0,w,h);
+  ctx.fillRect(0, 0, w, h);
 
-  for(let i=0;i<n*n;i++){
+  // タイルを並べる
+  for (let i = 0; i < n * n; i++) {
     const x = (i % n) * tileSize;
     const y = Math.floor(i / n) * tileSize;
-    if(i < imgs.length){
-      ctx.drawImage(imgs[i], x, y, tileSize, tileSize);
+    if (i < images.length) {
+      ctx.drawImage(images[i], x, y, tileSize, tileSize);
     } else {
       ctx.fillStyle = "#fff";
       ctx.fillRect(x, y, tileSize, tileSize);
     }
   }
 
-  document.getElementById('log').textContent =
+  document.getElementById("log").textContent =
     `${text.length}文字 → ${n}×${n}タイル (${w}×${h}px)`;
 }
 
-
 // PNG保存
-function downloadCanvas(){
-    const canvas = document.getElementById('canvas');
-    const url = canvas.toDataURL('image/png');
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'hiragana_tile.png';
-    a.click();
+function downloadCanvas() {
+  const canvas = document.getElementById("canvas");
+  const link = document.createElement("a");
+  link.download = "ayanai.png";
+  link.href = canvas.toDataURL("image/png");
+  link.click();
 }
 </script>
 </body>
 </html>
-
-
-
-
